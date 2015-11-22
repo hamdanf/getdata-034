@@ -1,0 +1,71 @@
+## Course Project: https://class.coursera.org/getdata-034
+## By: Firas Hamdan
+
+## Change working directory
+if (!dir.exists("./course_project_034")){dir.create("./course_project_034")}
+setwd("./course_project_034")
+
+## load necessary packages
+library(tidyr)
+library(dplyr)
+
+## Download data file from web
+temp <- tempfile() ## create temp file
+download.file("https://d396qusza40orc.cloudfront.net/getdata%2Fprojectfiles%2FUCI%20HAR%20Dataset.zip",temp) ## download zip file
+unzip(temp) ## unzip file
+rm(temp) ## remove temp file
+
+## Read in the data for each item
+activity_labels<-read.table("./UCI HAR Dataset/activity_labels.txt")
+features<-read.table("./UCI HAR Dataset/features.txt")
+x_train<-read.table("./UCI HAR Dataset/train/X_train.txt")
+y_train<-read.table("./UCI HAR Dataset/train/y_train.txt")
+subject_train<-read.table("./UCI HAR Dataset/train/subject_train.txt")
+x_test<-read.table("./UCI HAR Dataset/test/X_test.txt")
+y_test<-read.table("./UCI HAR Dataset/test/y_test.txt")
+subject_test<-read.table("./UCI HAR Dataset/test/subject_test.txt")
+
+## Step #1 - Merge training and test Datasets
+merged_train_data <- cbind(subject_train, y_train, x_train) ## merge train data into one data frame
+merged_test_data <- cbind(subject_test, y_test, x_test) ## merge train data into one data frame
+merged_data <- rbind(merged_train_data, merged_test_data)   ## merged of full train and test dataset
+
+## Step #2 - Extract only the measurements on the mean and standard deviation
+## find columns with mean and std in the name      
+feature_names <- as.character(features$V2) ## pull variable names from feature data frame
+subject_activity_vector<-c("subject", "activity") ## create a temporary vector of variable names for subject and activity
+feature_names2<-c(subject_activity_vector, feature_names) ## add subject and activity to feature_names character vector
+column_index<-grep("mean|std", feature_names2, ignore.case=TRUE, value=FALSE) ## create a column index for those columns with "mean" or "std"
+column_index<-c(1,2, column_index) ## add columns 1 and 2 to index.  These are the subject and activity columns
+merged_data2<-merged_data[,column_index] ## subset the merged data with column index
+
+##### Step #3 - Use descriptive activity names to name the activities in the data set
+merged_data2[,2]<-gsub("1","WALKING",merged_data2[,2])
+merged_data2[,2]<-gsub("2","WALKING_UPSTAIRS",merged_data2[,2])
+merged_data2[,2]<-gsub("3","WALKING_DOWNSTAIRS",merged_data2[,2])
+merged_data2[,2]<-gsub("4","SITTING",merged_data2[,2])
+merged_data2[,2]<-gsub("5","STANDING",merged_data2[,2])
+merged_data2[,2]<-gsub("6","LAYING",merged_data2[,2])
+
+## Step #4 - Appropriately label the data set with descriptive variable names
+feature_names2<-feature_names2[column_index] ## subset feature names with column index from step #2
+feature_names2<-gsub("\\()","",feature_names2)  ## remove paratheses from feature names
+feature_names2<-gsub("^f","freq-",feature_names2) ##replace initial f with "freq"
+feature_names2<-gsub("^t","time-",feature_names2) ##replace initial t with "time"
+feature_names2<-make.names(feature_names2, unique =T, allow_ = TRUE) ## removes illegal characters and makes colnames unique
+
+names(merged_data2)<-feature_names2 ## add feature names to column for train data
+merged_data2[,1] <- as.factor(merged_data2[,1]) ## convert the "subject" column to a factor
+merged_data2[,2] <- as.factor(merged_data2[,2]) ## convert the "activity" column to a facto
+
+
+## Step #5 Create a second, independent tidy data set with the average for each variable for each activity and each subject
+table_merged_data<-tbl_df(merged_data2)
+
+## chain together group by and summarize the generate final data Frame
+final_df<-table_merged_data %>% 
+        group_by(subject, activity) %>% 
+        summarise_each(funs(mean))
+write.table(final_df, file="tidy_data.txt", row.names=FALSE) ## Write final tidy data (final_df) to a text file
+
+
